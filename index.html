@@ -933,8 +933,14 @@ iniciar();
   .cel i.d{left:calc(50% - 3px);width:6px;top:20px;height:100%}
   #tira.ruta{padding:0;overflow:hidden;position:relative;touch-action:none;user-select:none}
   #tira.ruta svg{display:block;touch-action:none}
+  .zb button.on{background:#e9e9e9;color:#111}
+  #modG{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;padding:14px;z-index:20}
+  #modG .c{background:var(--panel);border-radius:16px;padding:14px;width:100%;max-width:520px;display:flex;flex-direction:column;gap:8px}
+  #modG p{margin:0;font-size:13px;color:var(--sub)}
+  #modG textarea{width:100%;height:34vh;border-radius:10px;border:2px solid #3a3f48;background:#14161a;color:var(--txt);font:12px/1.3 ui-monospace,Menlo,monospace;padding:8px}
+  #modG .f{display:flex;gap:8px}#modG .b{flex:1}
   .norte{position:absolute;left:8px;top:5px;font-size:11px;font-weight:700;color:#9aa0a8;pointer-events:none}
-  .zb{position:absolute;right:6px;bottom:6px;display:flex;gap:5px}
+  .zb{position:absolute;right:6px;top:6px;display:flex;gap:5px}
   .zb button{width:34px;height:34px;border:0;border-radius:9px;background:#2c313acc;color:var(--txt);font:inherit;font-size:19px;font-weight:700;padding:0}
   #vista{display:flex;gap:8px;align-items:center}
   #vista .seg{background:#14161a}
@@ -1194,36 +1200,61 @@ function aplicaZ(){const s=$('tira').querySelector('svg');if(!s)return;const w=R
   s.setAttribute('viewBox',`${Z.x.toFixed(2)} ${Z.y.toFixed(2)} ${(w/Z.k).toFixed(2)} ${(h/Z.k).toFixed(2)}`)}
 function zoomRuta(f,px,py){const k0=Z.k,k=Math.max(1,Math.min(6,k0*f)),wx=Z.x+px/k0,wy=Z.y+py/k0;Z.k=k;Z.x=wx-px/k;Z.y=wy-py/k;aplicaZ()}
 /* rom=true: modo Armar en el mapa (puntos en blanco; solo se ven los globos ya puestos) */
+/* ---- editor de globos (en Estudiar › Ruta): se arrastran y se guardan por línea ---- */
+let edG=false,GP={};const GBASE={};
+try{GP=JSON.parse(localStorage.getItem('metroGlobos')||'{}')}catch(e){}
+const guardaG=()=>{try{localStorage.setItem('metroGlobos',JSON.stringify(GP))}catch(e){}};
+const gk=()=>S.sis+'|'+S.linea;
+const offG=(n,w)=>{const o=(GP[gk()]&&GP[gk()][n])||(GBASE[gk()]&&GBASE[gk()][n]);return o?[o[0]*w/(o[2]||w),o[1]*w/(o[2]||w)]:[0,0]};
+const exportaG=()=>{const t={};for(const k of new Set([...Object.keys(GBASE),...Object.keys(GP)]))t[k]={...(GBASE[k]||{}),...(GP[k]||{})};
+  for(const k in t)for(const n in t[k])if(Math.abs(t[k][n][0])+Math.abs(t[k][n][1])<.5)delete t[k][n];
+  return JSON.stringify({v:1,globos:t})};
+function modalG(){
+  const d=document.createElement('div');d.id='modG';
+  d.innerHTML='<div class="c"><p>Copia este texto y mándamelo en el chat: yo dejo los globos así para todos.</p><textarea readonly></textarea><div class="f"><button class="b prim" id="mgC">📋 Copiar</button><button class="b" id="mgX">Cerrar</button></div></div>';
+  document.body.appendChild(d);const ta=d.querySelector('textarea');ta.value=exportaG();ta.select();
+  d.querySelector('#mgX').onclick=()=>d.remove();
+  d.querySelector('#mgC').onclick=()=>{ta.select();(navigator.clipboard?navigator.clipboard.writeText(ta.value):Promise.reject()).then(()=>aviso('Copiado ✅','ok',1200),()=>{try{document.execCommand('copy')}catch(e){}aviso('Si no se copió, selecciona el texto a mano','ok',2200)})};
+}
 function dibujaRuta(t,rom){
   const w=t.clientWidth,h=t.clientHeight,N=seq.length,col=COLOR[S.linea],FS=7.3,IC=15,LH=8.4;
-  const{P,B,L}=calcRuta(w,h),zk=[S.sis,S.linea,S.sent,rom?1:0].join('|');if(Z.key!==zk)Z={k:1,x:0,y:0,key:zk};
+  const{P,B:B0,L}=calcRuta(w,h);
+  const B=B0.map((b,i)=>{const o=rom?[0,0]:offG(seq[i],w);if(!o[0]&&!o[1])return b;const n={...b,x:b.x+o[0],y:b.y+o[1]};n.a=[Math.max(n.x-n.hw,Math.min(n.x+n.hw,P[i][0])),Math.max(n.y-n.hh,Math.min(n.y+n.hh,P[i][1]))];return n}),zk=[S.sis,S.linea,S.sent,rom?1:0].join('|');if(Z.key!==zk)Z={k:1,x:0,y:0,key:zk};
   let guias='',globos='',puntos='';
   const txt=`font-size="${FS}" font-weight="600" fill="#f2f2f2" stroke="#181a1f" stroke-width="2.2" paint-order="stroke"`;
   B.forEach((b,i)=>{if(rom&&!puestos.has(i))return;
     const e=seq[i],l=L[i],izq=b.x<P[i][0]-l.hw*.6,ix=izq?b.x+b.hw-1.5-IC:b.x-b.hw+1.5,tx=izq?ix-3:ix+IC+3,y1=b.y-l.ln.length*LH/2+LH*.78;
-    guias+=`<line x1="${P[i][0].toFixed(1)}" y1="${P[i][1].toFixed(1)}" x2="${b.a[0].toFixed(1)}" y2="${b.a[1].toFixed(1)}" stroke="#aab0ba" stroke-width=".7"/>`;
-    globos+=`<rect x="${ix.toFixed(1)}" y="${(b.y-IC/2).toFixed(1)}" width="${IC}" height="${IC}" rx="3" fill="${ICON[e]?'#fff':S.sis==='mb'?col:'#fff'}" stroke="#181a1f" stroke-width="1"/>`+(ICON[e]?`<image href="${ICON[e]}" x="${ix.toFixed(1)}" y="${(b.y-IC/2).toFixed(1)}" width="${IC}" height="${IC}"/>`:'');
+    guias+=`<line data-gl="${i}" x1="${P[i][0].toFixed(1)}" y1="${P[i][1].toFixed(1)}" x2="${b.a[0].toFixed(1)}" y2="${b.a[1].toFixed(1)}" stroke="#aab0ba" stroke-width=".7"/>`;
+    globos+=`<g data-gi="${i}"><rect x="${(b.x-b.hw).toFixed(1)}" y="${(b.y-b.hh).toFixed(1)}" width="${(2*b.hw).toFixed(1)}" height="${(2*b.hh).toFixed(1)}" fill="transparent"/><rect x="${ix.toFixed(1)}" y="${(b.y-IC/2).toFixed(1)}" width="${IC}" height="${IC}" rx="3" fill="${ICON[e]?'#fff':S.sis==='mb'?col:'#fff'}" stroke="#181a1f" stroke-width="1"/>`+(ICON[e]?`<image href="${ICON[e]}" x="${ix.toFixed(1)}" y="${(b.y-IC/2).toFixed(1)}" width="${IC}" height="${IC}"/>`:'');
     const tr=l.tr.map(q=>`<tspan fill="${COLOR[q]}" font-weight="800"> ●${q}</tspan>`).join('');
-    l.ln.forEach((s,q)=>{globos+=`<text x="${tx.toFixed(1)}" y="${(y1+q*LH).toFixed(1)}" text-anchor="${izq?'end':'start'}" ${txt}>${q?'':`<tspan fill="#9aa0a8">${i+1} </tspan>`}${s}${q===l.ln.length-1?tr:''}</text>`})});
+    l.ln.forEach((s,q)=>{globos+=`<text x="${tx.toFixed(1)}" y="${(y1+q*LH).toFixed(1)}" text-anchor="${izq?'end':'start'}" ${txt}>${q?'':`<tspan fill="#9aa0a8">${i+1} </tspan>`}${s}${q===l.ln.length-1?tr:''}</text>`});globos+='</g>'});
   P.forEach((p,i)=>{const hueco=rom&&!puestos.has(i),mal=hueco&&malos.has(i);
     puntos+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${hueco?4.6:3}" fill="${mal?'#5a1f1a':hueco?'#181a1f':'#fff'}" stroke="${mal?'#ff6b5e':hueco?'#f2f2f2':'#14161a'}" stroke-width="${hueco?1.4:.9}"/>`});
   const linea=`<polyline points="${P.map(p=>p.map(v=>v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
-  t.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${linea}${guias}${puntos}${globos}</svg><div class="norte">N ↑</div><div class="zb"><button data-z="1.6" aria-label="Acercar">+</button><button data-z="0.625" aria-label="Alejar">−</button><button data-z="0" aria-label="Ver todo">⤢</button></div>`;
-  t.querySelectorAll('.zb button').forEach(b=>b.onclick=()=>{const f=+b.dataset.z;if(f)zoomRuta(f,RC.w/2,RC.h/2);else{Z.k=1;aplicaZ()}});
+  t.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${linea}${guias}${puntos}${globos}</svg><div class="norte">${edG&&!rom?'✏️ Arrastra los globos':'N ↑'}</div><div class="zb">${rom?'':`<button data-ed="1" class="${edG?'on':''}" aria-label="Editar globos">✏️</button>${edG?'<button data-ed="r" aria-label="Restablecer esta línea">↺</button><button data-ed="x" aria-label="Exportar">📤</button>':''}`}<button data-z="1.6" aria-label="Acercar">+</button><button data-z="0.625" aria-label="Alejar">−</button><button data-z="0" aria-label="Ver todo">⤢</button></div>`;
+  t.querySelectorAll('.zb button').forEach(b=>b.onclick=()=>{
+    if(b.dataset.ed==='1'){edG=!edG;return dibujaRuta(t,rom)}
+    if(b.dataset.ed==='r'){if(b.dataset.q!=='1'){b.dataset.q='1';b.textContent='¿?';setTimeout(()=>{b.dataset.q='';b.textContent='↺'},2200);return}delete GP[gk()];guardaG();aviso('Línea en su acomodo original','ok',1200);return dibujaRuta(t,rom)}
+    if(b.dataset.ed==='x')return modalG();
+    const f=+b.dataset.z;if(f)zoomRuta(f,RC.w/2,RC.h/2);else{Z.k=1;aplicaZ()}});
   aplicaZ();
 }
 /* gestos del mapa: arrastrar, pellizcar, rueda; en Armar, un toque elige el punto más cercano */
-(()=>{const t=$('tira'),pt=new Map();let ini=null,movio=false;
+(()=>{const t=$('tira'),pt=new Map();let ini=null,movio=false,rq2=0;
   const loc=e=>{const r=t.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
   const activo=e=>t.classList.contains('ruta')&&!e.target.closest('.zb');
   const base=()=>{const v=[...pt.values()];ini=v.length===1?{p:v[0],x:Z.x,y:Z.y}:{d:Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]),k:Z.k,c:[(v[0][0]+v[1][0])/2,(v[0][1]+v[1][1])/2],x:Z.x,y:Z.y}};
-  t.addEventListener('pointerdown',e=>{if(!activo(e))return;if(!pt.size)movio=false;pt.set(e.pointerId,loc(e));if(pt.size>2){pt.delete(e.pointerId);return}if(pt.size===2)movio=true;base()});
+  t.addEventListener('pointerdown',e=>{if(!activo(e))return;if(!pt.size)movio=false;
+    const gi=edG&&S.resp==='ver'&&e.target.closest&&e.target.closest('[data-gi]');
+    if(gi&&!pt.size){const nm=seq[+gi.dataset.gi],o=offG(nm,t.clientWidth);pt.set(e.pointerId,loc(e));const gl=t.querySelector(`[data-gl="${gi.dataset.gi}"]`);ini={drag:nm,p:loc(e),o0:o,g:gi,gl,a0:gl?[+gl.getAttribute('x2'),+gl.getAttribute('y2')]:null};movio=true;return}
+    pt.set(e.pointerId,loc(e));if(pt.size>2){pt.delete(e.pointerId);return}if(pt.size===2)movio=true;base()});
   t.addEventListener('pointermove',e=>{if(!pt.has(e.pointerId)||!ini)return;pt.set(e.pointerId,loc(e));const v=[...pt.values()];
+    if(ini.drag!==undefined){const q=loc(e),w=t.clientWidth;(GP[gk()]=GP[gk()]||{})[ini.drag]=[ini.o0[0]+(q[0]-ini.p[0])/Z.k,ini.o0[1]+(q[1]-ini.p[1])/Z.k,w];const ddx=(q[0]-ini.p[0])/Z.k,ddy=(q[1]-ini.p[1])/Z.k;ini.g.setAttribute('transform',`translate(${ddx.toFixed(1)},${ddy.toFixed(1)})`);if(ini.gl&&ini.a0){ini.gl.setAttribute('x2',ini.a0[0]+ddx);ini.gl.setAttribute('y2',ini.a0[1]+ddy)}return}
     if(v.length===1){const dx=v[0][0]-ini.p[0],dy=v[0][1]-ini.p[1];if(Math.hypot(dx,dy)>8)movio=true;if(movio){Z.x=ini.x-dx/Z.k;Z.y=ini.y-dy/Z.k;aplicaZ()}}
     else{const d=Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]),c=[(v[0][0]+v[1][0])/2,(v[0][1]+v[1][1])/2],k=Math.max(1,Math.min(6,ini.k*d/ini.d));
       Z.x=ini.x+ini.c[0]/ini.k-c[0]/k;Z.y=ini.y+ini.c[1]/ini.k-c[1]/k;Z.k=k;aplicaZ()}});
   const fin=e=>{if(!pt.has(e.pointerId))return;const p=pt.get(e.pointerId);pt.delete(e.pointerId);
-    if(pt.size){base();return}ini=null;
+    if(pt.size){base();return}if(ini&&ini.drag!==undefined){guardaG();ini=null;dibujaRuta(t,false);return}ini=null;
     if(!movio&&e.type==='pointerup'&&S.resp==='rom'&&RC){const x=Z.x+p[0]/Z.k,y=Z.y+p[1]/Z.k;let m=-1,md=28/Z.k;
       RC.P.forEach((q,i)=>{if(puestos.has(i))return;const d=Math.hypot(q[0]-x,q[1]-y);if(d<md){md=d;m=i}});if(m>=0)tocaRom(m)}};
   t.addEventListener('pointerup',fin);t.addEventListener('pointercancel',fin);
