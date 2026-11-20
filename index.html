@@ -1201,11 +1201,12 @@ function aplicaZ(){const s=$('tira').querySelector('svg');if(!s)return;const w=R
 function zoomRuta(f,px,py){const k0=Z.k,k=Math.max(1,Math.min(6,k0*f)),wx=Z.x+px/k0,wy=Z.y+py/k0;Z.k=k;Z.x=wx-px/k;Z.y=wy-py/k;aplicaZ()}
 /* rom=true: modo Armar en el mapa (puntos en blanco; solo se ven los globos ya puestos) */
 /* ---- editor de globos (en Estudiar › Ruta): se arrastran y se guardan por línea ---- */
-let edG=false,GP={};const GBASE={};
+let edG=false,GP={};const GBASE={"metro|1": {"Salto del Agua": [-26.400672523579082, 26.4424031941685, 352], "Tacubaya": [-7.5365158581918905, 10.94337361163185, 352], "Isabel la Católica": [3.8190756572554085, 16.798884694663197, 352], "Chapultepec": [-80.70380881281683, -20.230786114223086, 352], "Observatorio": [-22.90043064278659, 3.2658235385498195, 352], "Juanacatlán": [77.3748961441034, 31.62693990520473, 352], "Sevilla": [-32.7417094562597, -4.985147184834853, 352], "Insurgentes": [-18.8920536334644, -4.151616624569254, 352], "Cuauhtémoc": [-4.877823588544804, -11.661677484940425, 352], "Merced": [-21.71144585868361, 8.584809778664441, 352], "Pino Suárez": [-32.01074033218916, 5.871690687743824, 352], "Balderas": [3.73747004489142, 114.99617458016436, 352], "Candelaria": [-52.49666291239107, 14.8280558048466, 352], "Balbuena": [-12.456664092792288, -15.765442196327207, 352], "San Lázaro": [-55.13857849537193, -11.385070464472015, 352], "Moctezuma": [-23.087736736935412, -14.723934174983457, 352], "Pantitlán": [20.141963045543164, 108.23000472327185, 352], "Gómez Farías": [-39.64576673192584, 1.116814372396533, 352], "Boulevard Puerto Aéreo": [48.93059811304252, -101.97008174879939, 352], "Zaragoza": [-4.3129721053857395, -36.17271342847343, 352]}};
 try{GP=JSON.parse(localStorage.getItem('metroGlobos')||'{}')}catch(e){}
 const guardaG=()=>{try{localStorage.setItem('metroGlobos',JSON.stringify(GP))}catch(e){}};
 const gk=()=>S.sis+'|'+S.linea;
-const offG=(n,w)=>{const o=(GP[gk()]&&GP[gk()][n])||(GBASE[gk()]&&GBASE[gk()][n]);return o?[o[0]*w/(o[2]||w),o[1]*w/(o[2]||w)]:[0,0]};
+const getG=n=>(GP[gk()]&&GP[gk()][n])||(GBASE[gk()]&&GBASE[gk()][n]); // [dx,dy,anchoRef,fx,fy]: si hay fx,fy el globo va en esa posición relativa a la pantalla
+const offG=(n,w)=>{const o=getG(n);return o?[o[0]*w/(o[2]||w),o[1]*w/(o[2]||w)]:[0,0]};
 const exportaG=()=>{const t={};for(const k of new Set([...Object.keys(GBASE),...Object.keys(GP)]))t[k]={...(GBASE[k]||{}),...(GP[k]||{})};
   for(const k in t)for(const n in t[k])if(Math.abs(t[k][n][0])+Math.abs(t[k][n][1])<.5)delete t[k][n];
   return JSON.stringify({v:1,globos:t})};
@@ -1219,7 +1220,7 @@ function modalG(){
 function dibujaRuta(t,rom){
   const w=t.clientWidth,h=t.clientHeight,N=seq.length,col=COLOR[S.linea],FS=7.3,IC=15,LH=8.4;
   const{P,B:B0,L}=calcRuta(w,h);
-  const B=B0.map((b,i)=>{const o=rom?[0,0]:offG(seq[i],w);if(!o[0]&&!o[1])return b;const n={...b,x:b.x+o[0],y:b.y+o[1]};n.a=[Math.max(n.x-n.hw,Math.min(n.x+n.hw,P[i][0])),Math.max(n.y-n.hh,Math.min(n.y+n.hh,P[i][1]))];return n}),zk=[S.sis,S.linea,S.sent,rom?1:0].join('|');if(Z.key!==zk)Z={k:1,x:0,y:0,key:zk};
+  const B=B0.map((b,i)=>{const g=rom?null:getG(seq[i]);let o=rom?[0,0]:offG(seq[i],w);if(g&&g.length>=5)o=[g[3]*w-b.x,g[4]*h-b.y];if(!o[0]&&!o[1])return b;const n={...b,x:b.x+o[0],y:b.y+o[1]};n.a=[Math.max(n.x-n.hw,Math.min(n.x+n.hw,P[i][0])),Math.max(n.y-n.hh,Math.min(n.y+n.hh,P[i][1]))];return n}),zk=[S.sis,S.linea,S.sent,rom?1:0].join('|');if(Z.key!==zk)Z={k:1,x:0,y:0,key:zk};
   let guias='',globos='',puntos='';
   const txt=`font-size="${FS}" font-weight="600" fill="#f2f2f2" stroke="#181a1f" stroke-width="2.2" paint-order="stroke"`;
   B.forEach((b,i)=>{if(rom&&!puestos.has(i))return;
@@ -1246,10 +1247,10 @@ function dibujaRuta(t,rom){
   const base=()=>{const v=[...pt.values()];ini=v.length===1?{p:v[0],x:Z.x,y:Z.y}:{d:Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]),k:Z.k,c:[(v[0][0]+v[1][0])/2,(v[0][1]+v[1][1])/2],x:Z.x,y:Z.y}};
   t.addEventListener('pointerdown',e=>{if(!activo(e))return;if(!pt.size)movio=false;
     const gi=edG&&S.resp==='ver'&&e.target.closest&&e.target.closest('[data-gi]');
-    if(gi&&!pt.size){const nm=seq[+gi.dataset.gi],o=offG(nm,t.clientWidth);pt.set(e.pointerId,loc(e));const gl=t.querySelector(`[data-gl="${gi.dataset.gi}"]`);ini={drag:nm,p:loc(e),o0:o,g:gi,gl,a0:gl?[+gl.getAttribute('x2'),+gl.getAttribute('y2')]:null};movio=true;return}
+    if(gi&&!pt.size){const nm=seq[+gi.dataset.gi],g0=getG(nm),b0=RC&&RC.B[+gi.dataset.gi],o=(g0&&g0.length>=5&&b0)?[g0[3]*t.clientWidth-b0.x,g0[4]*t.clientHeight-b0.y]:offG(nm,t.clientWidth);pt.set(e.pointerId,loc(e));const gl=t.querySelector(`[data-gl="${gi.dataset.gi}"]`);ini={drag:nm,p:loc(e),o0:o,g:gi,gl,a0:gl?[+gl.getAttribute('x2'),+gl.getAttribute('y2')]:null};movio=true;return}
     pt.set(e.pointerId,loc(e));if(pt.size>2){pt.delete(e.pointerId);return}if(pt.size===2)movio=true;base()});
   t.addEventListener('pointermove',e=>{if(!pt.has(e.pointerId)||!ini)return;pt.set(e.pointerId,loc(e));const v=[...pt.values()];
-    if(ini.drag!==undefined){const q=loc(e),w=t.clientWidth;(GP[gk()]=GP[gk()]||{})[ini.drag]=[ini.o0[0]+(q[0]-ini.p[0])/Z.k,ini.o0[1]+(q[1]-ini.p[1])/Z.k,w];const ddx=(q[0]-ini.p[0])/Z.k,ddy=(q[1]-ini.p[1])/Z.k;ini.g.setAttribute('transform',`translate(${ddx.toFixed(1)},${ddy.toFixed(1)})`);if(ini.gl&&ini.a0){ini.gl.setAttribute('x2',ini.a0[0]+ddx);ini.gl.setAttribute('y2',ini.a0[1]+ddy)}return}
+    if(ini.drag!==undefined){const q=loc(e),w=t.clientWidth;const nx=ini.o0[0]+(q[0]-ini.p[0])/Z.k,ny=ini.o0[1]+(q[1]-ini.p[1])/Z.k,bi=seq.indexOf(ini.drag),bb=RC&&RC.B[bi];(GP[gk()]=GP[gk()]||{})[ini.drag]=bb?[nx,ny,w,(bb.x+nx)/w,(bb.y+ny)/t.clientHeight]:[nx,ny,w];const ddx=(q[0]-ini.p[0])/Z.k,ddy=(q[1]-ini.p[1])/Z.k;ini.g.setAttribute('transform',`translate(${ddx.toFixed(1)},${ddy.toFixed(1)})`);if(ini.gl&&ini.a0){ini.gl.setAttribute('x2',ini.a0[0]+ddx);ini.gl.setAttribute('y2',ini.a0[1]+ddy)}return}
     if(v.length===1){const dx=v[0][0]-ini.p[0],dy=v[0][1]-ini.p[1];if(Math.hypot(dx,dy)>8)movio=true;if(movio){Z.x=ini.x-dx/Z.k;Z.y=ini.y-dy/Z.k;aplicaZ()}}
     else{const d=Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]),c=[(v[0][0]+v[1][0])/2,(v[0][1]+v[1][1])/2],k=Math.max(1,Math.min(6,ini.k*d/ini.d));
       Z.x=ini.x+ini.c[0]/ini.k-c[0]/k;Z.y=ini.y+ini.c[1]/ini.k-c[1]/k;Z.k=k;aplicaZ()}});
