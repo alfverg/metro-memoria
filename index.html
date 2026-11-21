@@ -14,13 +14,15 @@
   nav{flex:none;display:flex;gap:6px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--bar);border-top:1px solid #2a2e36}
   nav button{flex:1;font:inherit;font-size:13px;white-space:nowrap;padding:0 2px;font-weight:700;min-height:48px;border:0;border-radius:12px;background:#2c313a;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:8px}
   nav button.on{background:#e9e9e9;color:#111}
+  nav{position:relative}
+  #ver{position:absolute;right:8px;top:-11px;font-size:9px;color:#6b7078;pointer-events:none}
   #carga{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:15px}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="vistas"><div id="carga">Cargando…</div></div>
-  <nav>
+  <nav><span id="ver">v1.3 · 21 nov</span>
     <button data-j="lineas">🗺️ Líneas</button>
     <button data-j="estaciones">🚉 Estaciones</button>
     <button data-j="mapa">🧭 Mapa</button>
@@ -1059,6 +1061,7 @@ function fila(est,cls){
   return d;
 }
 function iniciar(){
+  clearInterval(tim);
   if(cur!==S.sis)setSis();
   seq=[...LINEAS[S.linea]]; if(S.sent<0) seq.reverse();
   pos=1;primeras=0;bloq=false;$('tira').classList.remove('mini','ruta');$('tira').classList.toggle('rom',S.resp==='rom');$('marc').style.visibility='';
@@ -1142,11 +1145,19 @@ $('escr').onsubmit=e=>{e.preventDefault();if(bloq)return;
   else if(norm($('txt').value)){falla();$('txt').select()}
 };
 $('btnNose').onclick=()=>{if(bloq)return;fallos++;aviso('Era: '+seq[pos],'bad',1300);acierta(true)};
+/* ---- récord de tiempo en Armar (solo cuenta si todas salen bien a la primera) ---- */
+let REC={},t0=0,tim=0;try{REC=JSON.parse(localStorage.getItem('metroRec')||'{}')}catch(e){}
+const recK=()=>S.sis+'|'+S.linea;
+const fmtT=ms=>{const s=ms/1000,m=Math.floor(s/60);return m+':'+(s-m*60).toFixed(1).padStart(4,'0')};
 function terminar(){
   const tot=S.resp==='rom'?seq.length:seq.length-1;
+  let extra='',nuevo=false;
+  if(S.resp==='rom'){clearInterval(tim);const el=Date.now()-t0,k=recK(),perfecto=primeras===tot;
+    if(perfecto&&(!REC[k]||el<REC[k])){REC[k]=el;nuevo=true;try{localStorage.setItem('metroRec',JSON.stringify(REC))}catch(e){}}
+    extra=` · ⏱ ${fmtT(el)}`+(nuevo?' · 🏆 ¡Nuevo récord!':REC[k]?` · récord ${fmtT(REC[k])}`:'')+(!perfecto?' (el récord cuenta sin errores)':'')}
   $('juego').style.display='none';$('fin').style.display='';
-  $('finTit').textContent=(primeras===tot?'🏆 ¡Línea '+S.linea+' perfecta!':'🚇 ¡Línea '+S.linea+' completa!');
-  $('finTxt').textContent=`${primeras} de ${tot} al primer intento.`;
+  $('finTit').textContent=(nuevo?'🏆 ¡Récord! Línea '+S.linea:primeras===tot?'🏆 ¡Línea '+S.linea+' perfecta!':'🚇 ¡Línea '+S.linea+' completa!');
+  $('finTxt').textContent=`${primeras} de ${tot} al primer intento${extra||'.'}`;
   $('tira').scrollTop=$('tira').scrollHeight;
 }
 /* ---- vista Ruta: la línea completa con su forma real (norte arriba) al centro; globos de estación a izquierda y derecha con línea guía ---- */
@@ -1265,6 +1276,7 @@ function dibujaRuta(t,rom){
 /* ---- modo rompecabezas: toda la línea en blanco; sale una estación al azar y la pones en su punto exacto (en lista o en el mapa) ---- */
 let puestos=new Set(),cola=[],filas=[];
 function iniciarRom(){
+  t0=Date.now();clearInterval(tim);tim=setInterval(()=>{const e=$('tmr');if(e)e.textContent='⏱ '+fmtT(Date.now()-t0).replace(/\.\d$/,'')},500);
   puestos=new Set();malos.clear();cola=barajar(seq.map((_,i)=>i));pintaRom();pregRom();
 }
 function pintaRom(){
@@ -1284,7 +1296,7 @@ function pregRom(){
   $('score').textContent=primeras;$('prog').textContent=puestos.size+'/'+seq.length;
   if(!cola.length) return terminar();
   const est=seq[cola[0]],conLogo=S.logo==='1'&&ICON[est],mapa=S.vrom==='mapa';
-  $('preg').innerHTML=(conLogo?`<img src="${ICON[est]}" alt="">`:'')+`<div style="flex:1;min-width:0">🧩 ${est}<small>${hintDe(est)}Toca su punto · faltan ${cola.length}</small></div><button class="b" id="btnVR" style="flex:none;min-height:44px;padding:8px 12px">${mapa?'☰ Lista':'🗺️ Mapa'}</button>`;
+  $('preg').innerHTML=(conLogo?`<img src="${ICON[est]}" alt="">`:'')+`<div style="flex:1;min-width:0">🧩 ${est}<small>${hintDe(est)}Toca su punto · faltan ${cola.length} · <span id="tmr">⏱ ${fmtT(Date.now()-t0).replace(/\.\d$/,'')}</span>${REC[recK()]?` · 🏆 ${fmtT(REC[recK()]).replace(/\.\d$/,'')}`:''}</small></div><button class="b" id="btnVR" style="flex:none;min-height:44px;padding:8px 12px">${mapa?'☰ Lista':'🗺️ Mapa'}</button>`;
   $('btnVR').onclick=()=>{S.vrom=mapa?'lista':'mapa';guarda();pintaRom();pregRom()};
   $('opcs').style.display='none';$('escr').style.display='none';
 }
